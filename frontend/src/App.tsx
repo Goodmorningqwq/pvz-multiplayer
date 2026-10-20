@@ -12,6 +12,7 @@ import {
 } from './network';
 import ModeSelect from './pages/ModeSelect/ModeSelect';
 import GameSettings, { Difficulty } from './pages/GameSettings/GameSettings';
+import SoloSelect, { LEVEL_COUNT } from './pages/SoloSelect/SoloSelect';
 import WaitingRoom from './pages/WaitingRoom/WaitingRoom';
 import GameInProgress from './pages/WaitingRoom/GameInProgress';
 import Game from './pages/Game/Game';
@@ -55,6 +56,11 @@ export default function App() {
   const onePlayerMode = useMemo(() => {
     const soloValue = getSearchParam('solo');
     return soloValue === '1' || soloValue === 'true';
+  }, []);
+  // ?level=N on a solo link plays campaign level N instead of a difficulty.
+  const level = useMemo(() => {
+    const raw = Number(getSearchParam('level'));
+    return Number.isInteger(raw) && raw >= 1 && raw <= LEVEL_COUNT ? raw : undefined;
   }, []);
 
   // roomId starts from the URL (so shared links still work) but is otherwise
@@ -105,7 +111,17 @@ export default function App() {
   function startSolo(chosenDifficulty: Difficulty) {
     const url = new URL(window.location.href);
     url.searchParams.set('solo', '1');
+    url.searchParams.delete('level');
     url.searchParams.set('difficulty', chosenDifficulty);
+    window.history.replaceState({}, '', url.toString());
+    window.location.reload();
+  }
+
+  function startLevel(chosenLevel: number) {
+    const url = new URL(window.location.href);
+    url.searchParams.set('solo', '1');
+    url.searchParams.delete('difficulty');
+    url.searchParams.set('level', String(chosenLevel));
     window.history.replaceState({}, '', url.toString());
     window.location.reload();
   }
@@ -132,7 +148,7 @@ export default function App() {
     if (demoMode) {
       connectDemo({ playerId });
     } else if (onePlayerMode) {
-      connectOnePlayer({ playerId, difficulty });
+      connectOnePlayer({ playerId, difficulty, level });
     } else {
       connect({ roomId: activeRoomId, playerId, difficulty });
     }
@@ -196,10 +212,24 @@ export default function App() {
     // Deliberately depends on isPreConnectPhase rather than `phase` itself:
     // this effect should stay connected across the waiting -> playing
     // transition, not tear down and reconnect when the match starts.
-  }, [demoMode, onePlayerMode, isPreConnectPhase, activeRoomId, playerId, difficulty]);
+  }, [demoMode, onePlayerMode, isPreConnectPhase, activeRoomId, playerId, difficulty, level]);
 
   if (phase === 'mode-select') {
     return <ModeSelect onSelectMode={selectMode} onPlayDemo={playDemo} />;
+  }
+
+  if (phase === 'settings' && selectedMode === 'singleplayer') {
+    // Zen launches the demo sandbox until it gets a mode of its own.
+    return (
+      <SoloSelect
+        onBack={backToModeSelect}
+        onPlayZen={playDemo}
+        onStartLevel={startLevel}
+        onStartCustom={startSolo}
+        difficulty={difficulty}
+        onDifficultyChange={setDifficulty}
+      />
+    );
   }
 
   if (phase === 'settings' && selectedMode) {

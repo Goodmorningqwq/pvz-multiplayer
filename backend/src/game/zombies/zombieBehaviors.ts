@@ -31,6 +31,7 @@ export function advanceZombieEating(_room: RoomState, zombie: ZombieState, block
 export const ZOMBIE_BEHAVIORS: Record<ZombieType, (room: RoomState, zombie: ZombieState, blockingSlot: SlotState) => void> = {
   shambler: advanceZombieEating,
   runner: advanceZombieEating,
+  conehead: advanceZombieEating,
   // The brute has no special behavior of its own — it's a stat block, not a
   // new mechanic. Everything that makes it feel different (slow approach,
   // heavy chomp, huge HP pool) already comes from its def.

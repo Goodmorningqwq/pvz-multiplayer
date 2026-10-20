@@ -26,7 +26,7 @@ import {
   LANE_COUNT,
   getLaneY,
 } from './config/gameConfig.js';
-import { ORCHESTRATION_STEPS_BY_DIFFICULTY, OrchestrationStep } from './config/orchestrationSteps.js';
+import { LevelSpawnChunk } from './config/levelSpawns.js';
 import PROJECTILE_DEFS from './config/projectileDefs.json' with { type: 'json' };
 import {
   SLINGSHOT_COOLDOWN_TICKS,
@@ -213,37 +213,27 @@ export function broadcastState(room: RoomState) {
     // above) keeps the server the sole owner of board geometry instead of the
     // client re-deriving the lane formula to place the fork.
     slingshot: { x: SLINGSHOT_X, y: SLINGSHOT_Y },
+    // Campaign level number (1-based), or null when playing a difficulty preset.
+    level: room.level,
+    levelName: room.levelSpawn.name,
     ...computeWaveDisplay(room),
   };
 }
 
-// Pure display shim: derives the legacy wave/waveStatus/totalWaves shape the
-// frontend HUD already parses from the new step-based orchestration state,
-// so the wire contract doesn't change even though RoomState no longer stores
-// wave fields directly.
+// Derives the wave/waveStatus/totalWaves HUD shape from the room's LevelSpawn
+// progress. 'spawning' covers both spawning and clearing: from the player's
+// side the wave is still on until its last zombie dies.
 function computeWaveDisplay(room: RoomState): { wave: number; waveStatus: WaveStatus; totalWaves: number } {
-  const steps = ORCHESTRATION_STEPS_BY_DIFFICULTY[room.difficulty];
-  const totalWaves = steps.filter((step) => step.kind === 'event').length;
+  const totalWaves = room.levelSpawn.waves.length;
 
-  let eventOrdinal = 0;
-  for (let index = 0; index <= room.orchestrationStepIndex && index < steps.length; index += 1) {
-    if (steps[index].kind === 'event') {
-      eventOrdinal += 1;
-    }
+  if (room.waveIndex >= totalWaves) {
+    return { wave: totalWaves, waveStatus: 'complete', totalWaves };
   }
-
-  let waveStatus: WaveStatus;
-  if (room.orchestrationStepIndex >= steps.length) {
-    waveStatus = 'complete';
-  } else if (steps[room.orchestrationStepIndex].kind === 'event') {
-    waveStatus = 'spawning';
-  } else if (eventOrdinal === 0) {
-    waveStatus = 'pending';
-  } else {
-    waveStatus = 'break';
+  if (room.wavePhase !== 'break') {
+    return { wave: room.waveIndex + 1, waveStatus: 'spawning', totalWaves };
   }
-
-  return { wave: eventOrdinal, waveStatus, totalWaves };
+  // During a break the HUD still shows the wave just cleared, as before.
+  return { wave: room.waveIndex, waveStatus: room.waveIndex === 0 ? 'pending' : 'break', totalWaves };
 }
 
 export function endGame(room: RoomState, result: 'win' | 'lose') {
@@ -255,7 +245,9 @@ export function endGame(room: RoomState, result: 'win' | 'lose') {
   room.result = result;
 }
 
-export function spawnZombieInLane(room: RoomState, laneIndex: number, type: ZombieType) {
+// waveIndex/chunkIndex default to -1: a zombie from outside the script (the
+// admin CLI) belongs to no wave, so it never holds one open.
+export function spawnZombieInLane(room: RoomState, laneIndex: number, type: ZombieType, waveIndex = -1, chunkIndex = -1) {
   const normalizedLaneIndex = Math.max(0, Math.min(LANE_COUNT - 1, Math.floor(laneIndex)));
 
   room.zombies.push({
@@ -266,6 +258,8 @@ export function spawnZombieInLane(room: RoomState, laneIndex: number, type: Zomb
     y: roomLaneY(normalizedLaneIndex),
     hp: ZOMBIE_DEFS[type].hp,
     chompCooldown: 0,
+    waveIndex,
+    chunkIndex,
   });
 }
 
@@ -274,72 +268,95 @@ export function spawnZombie(room: RoomState, type: ZombieType) {
   spawnZombieInLane(room, laneIndex, type);
 }
 
-export function stepDurationTicks(step: OrchestrationStep): number {
-  return step.seconds * TICK_RATE;
+function secondsToTicks(seconds: number): number {
+  return Math.round(seconds * TICK_RATE);
 }
 
-// Walks the room's difficulty-selected step list sequentially: 'time' steps
-// just pause, 'event' steps spawn their zombie list spread evenly across
-// the step's duration. Replaces the old WAVES + advanceWaveState state
-// machine — unlike that machine, this is purely time-driven (an 'event'
-// step doesn't wait for the board to clear before the following 'time' step
-// starts counting down). Only reaching the end of the list still gates the
-// win on the board being clear.
-export function advanceOrchestration(room: RoomState) {
+// A chunk's zombies in spawn order, each with its lane (null = random).
+function chunkSpawnOrder(chunk: LevelSpawnChunk): { type: ZombieType; lane: number | null }[] {
+  return chunk.zombies.flatMap((group) => Array.from({ length: group.count }, () => ({ type: group.type, lane: group.lane ?? null })));
+}
+
+// Plays the room's LevelSpawn script. Each wave runs:
+//   break     count down breakBefore
+//   spawning  walk the chunks in order, spreading each chunk's zombies evenly
+//             over its `seconds` (the first spawns at once), then waiting its
+//             pauseAfter before the next chunk
+//   clearing  wait until no zombie tagged with this wave is left
+// and only then does the next wave's break start. The game is won once the
+// last wave is cleared and the board is empty.
+export function advanceLevelSpawn(room: RoomState) {
   if (room.gameOver) {
     return;
   }
 
-  const steps = ORCHESTRATION_STEPS_BY_DIFFICULTY[room.difficulty];
+  const { waves } = room.levelSpawn;
 
-  if (room.orchestrationStepIndex >= steps.length) {
+  if (room.waveIndex >= waves.length) {
     if (room.zombies.length === 0) {
       endGame(room, 'win');
     }
     return;
   }
 
-  const step = steps[room.orchestrationStepIndex];
+  const wave = waves[room.waveIndex];
 
-  if (step.kind === 'time') {
-    room.orchestrationStepTimer -= 1;
-    if (room.orchestrationStepTimer <= 0) {
-      advanceToNextOrchestrationStep(room);
+  if (room.wavePhase === 'break') {
+    room.spawnTimer -= 1;
+    if (room.spawnTimer <= 0) {
+      room.wavePhase = 'spawning';
+      room.chunkIndex = 0;
+      room.spawnedInChunk = 0;
+      room.spawnTimer = 0;
     }
     return;
   }
 
-  const sequence: ZombieType[] = step.zombies.flatMap((entry) => Array(entry.count).fill(entry.type));
+  if (room.wavePhase === 'spawning') {
+    if (room.spawnTimer > 0) {
+      room.spawnTimer -= 1;
+      return;
+    }
 
-  if (room.orchestrationSpawnedInStep < sequence.length) {
-    if (room.orchestrationStepTimer <= 0) {
-      spawnZombie(room, sequence[room.orchestrationSpawnedInStep]);
-      room.orchestrationSpawnedInStep += 1;
-      const remaining = sequence.length - room.orchestrationSpawnedInStep;
-      room.orchestrationStepTimer = remaining > 0
-        ? Math.max(1, Math.round(stepDurationTicks(step) / sequence.length))
-        : 0;
+    const chunk = wave.chunks[room.chunkIndex];
+    const order = chunk ? chunkSpawnOrder(chunk) : [];
+
+    if (room.spawnedInChunk < order.length) {
+      const next = order[room.spawnedInChunk];
+      const lane = next.lane ?? Math.floor(Math.random() * LANE_COUNT);
+      spawnZombieInLane(room, lane, next.type, room.waveIndex, room.chunkIndex);
+      room.spawnedInChunk += 1;
+    }
+
+    if (room.spawnedInChunk < order.length) {
+      room.spawnTimer = Math.max(1, Math.round(secondsToTicks(chunk.seconds) / order.length));
+      return;
+    }
+
+    // Chunk done: wait out its pauseAfter, then start the next chunk, or
+    // hand over to clearing once the wave has nothing left to spawn.
+    if (room.chunkIndex + 1 < wave.chunks.length) {
+      room.chunkIndex += 1;
+      room.spawnedInChunk = 0;
+      room.spawnTimer = secondsToTicks(chunk?.pauseAfter ?? 0);
     } else {
-      room.orchestrationStepTimer -= 1;
+      room.wavePhase = 'clearing';
     }
     return;
   }
 
-  if (room.orchestrationStepTimer > 0) {
-    room.orchestrationStepTimer -= 1;
+  // 'clearing'
+  const waveIndex = room.waveIndex;
+  if (room.zombies.some((zombie) => zombie.waveIndex === waveIndex)) {
     return;
   }
 
-  advanceToNextOrchestrationStep(room);
-}
-
-function advanceToNextOrchestrationStep(room: RoomState) {
-  room.orchestrationStepIndex += 1;
-  room.orchestrationSpawnedInStep = 0;
-  const nextStep = ORCHESTRATION_STEPS_BY_DIFFICULTY[room.difficulty][room.orchestrationStepIndex];
-  // 'time' steps count down the full pause; 'event' steps start at 0 so the
-  // first zombie spawns immediately rather than waiting a full step-duration.
-  room.orchestrationStepTimer = nextStep && nextStep.kind === 'time' ? stepDurationTicks(nextStep) : 0;
+  room.waveIndex += 1;
+  room.wavePhase = 'break';
+  room.chunkIndex = 0;
+  room.spawnedInChunk = 0;
+  const nextWave = waves[room.waveIndex];
+  room.spawnTimer = nextWave ? secondsToTicks(nextWave.breakBefore) : 0;
 }
 
 export function advancePlants(room: RoomState) {

@@ -144,7 +144,9 @@ Broadcast to both players on every server tick (currently `TICK_RATE=15`, config
   },
   "wave": 2,
   "waveStatus": "spawning",
-  "totalWaves": 3
+  "totalWaves": 3,
+  "level": 3,
+  "levelName": "Cone Zone"
 }
 ```
 
@@ -154,7 +156,15 @@ what's in the latest tick. Every slot and zombie carries `laneIndex` (0-4);
 combat, chomping, and blocking are all scoped to matching `laneIndex` only —
 a peashooter never fires across lanes. `waveStatus` is one of `pending` (before
 wave 1 starts), `spawning` (zombies still being introduced or alive), `break`
-(between waves), or `complete` (all waves cleared). Cooldown/timer internals
+(between waves), or `complete` (all waves cleared). A wave stays `spawning`
+until every zombie it spawned is dead; only then does the break before the next
+wave start. `level` is the campaign level (1-10) when the room was created with
+one, otherwise `null`; `levelName` names the zombie script being played (a level
+name, or Easy/Medium/Hard).
+
+`join_one_player_room` accepts an optional `level` (integer 1-10) next to
+`difficulty`. A valid level takes priority; anything else falls back to the
+difficulty preset. Cooldown/timer internals
 (`slot.plant.cooldown`, `sunTimer`, `zombie.chompCooldown`) are server-only and
 stripped before broadcast.
 

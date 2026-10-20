@@ -894,6 +894,37 @@
   font-family: system-ui, sans-serif;
 }
 
+/* Singleplayer mode list and level grid (SoloSelect) */
+.solo-mode-list {
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+}
+
+.level-grid {
+  display: grid;
+  grid-template-columns: repeat(5, 1fr);
+  gap: 10px;
+}
+
+.level-button {
+  aspect-ratio: 1;
+  font-size: 18px;
+  font-weight: 700;
+  color: #2a3324;
+  font-family: system-ui, sans-serif;
+  background: #f2f5ee;
+  border: 2px solid transparent;
+  border-radius: 10px;
+  cursor: pointer;
+  transition: background 0.15s ease, border-color 0.15s ease;
+}
+
+.level-button:hover {
+  background: rgba(74, 143, 82, 0.14);
+  border-color: #4a8f52;
+}
+
 /* Waiting room (shown between joining a room and the opponent connecting) */
 
 .waiting-room-backdrop {

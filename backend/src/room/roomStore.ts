@@ -1,6 +1,6 @@
 import { v4 as uuidv4 } from 'uuid';
 import { SLOT_COUNT, LANE_COUNT, PLANT_MATTER_OVERFLOW_GRACE_TICKS, TICK_RATE, getLaneY, getSlotX } from '../game/config/gameConfig.js';
-import { ORCHESTRATION_STEPS_BY_DIFFICULTY } from '../game/config/orchestrationSteps.js';
+import { DIFFICULTY_SPAWNS, getLevelSpawn } from '../game/config/levelSpawns.js';
 import { RoomDifficulty, RoomMode, RoomState, SlotState } from '../game/types.js';
 
 const rooms = new Map<string, RoomState>();
@@ -30,13 +30,20 @@ function buildSlots(): SlotState[] {
   return slots;
 }
 
-export function getOrCreateRoom(roomId: string, mode: RoomMode = 'twoPlayer', difficulty: RoomDifficulty = 'medium'): RoomState {
+// `level` (1-based) picks a campaign LevelSpawn and takes priority over
+// `difficulty`; an unknown level falls back to the difficulty preset.
+export function getOrCreateRoom(
+  roomId: string,
+  mode: RoomMode = 'twoPlayer',
+  difficulty: RoomDifficulty = 'medium',
+  level: number | null = null,
+): RoomState {
   const existingRoom = rooms.get(roomId);
   if (existingRoom) {
     return existingRoom;
   }
 
-  const firstStep = ORCHESTRATION_STEPS_BY_DIFFICULTY[difficulty][0];
+  const levelSpawn = (level !== null && getLevelSpawn(level)) || DIFFICULTY_SPAWNS[difficulty];
 
   const createdRoom: RoomState = {
     roomId,
@@ -59,12 +66,14 @@ export function getOrCreateRoom(roomId: string, mode: RoomMode = 'twoPlayer', di
     plantMatterOverflowGraceTicks: PLANT_MATTER_OVERFLOW_GRACE_TICKS,
     tick: 0,
     gameOver: false,
-    orchestrationStepIndex: 0,
-    // 'time' steps count down the full pause; 'event' steps start at 0 so the
-    // first zombie spawns immediately (mirrors advanceToNextOrchestrationStep
-    // in defaultGameEngine.ts).
-    orchestrationStepTimer: firstStep.kind === 'time' ? firstStep.seconds * TICK_RATE : 0,
-    orchestrationSpawnedInStep: 0,
+    level: levelSpawn === DIFFICULTY_SPAWNS[difficulty] ? null : level,
+    levelSpawn,
+    // Every room opens on wave 0's break, which doubles as the pre-game delay.
+    waveIndex: 0,
+    wavePhase: 'break',
+    chunkIndex: 0,
+    spawnedInChunk: 0,
+    spawnTimer: Math.round((levelSpawn.waves[0]?.breakBefore ?? 0) * TICK_RATE),
   };
 
   rooms.set(roomId, createdRoom);

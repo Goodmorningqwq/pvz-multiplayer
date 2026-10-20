@@ -1,10 +1,11 @@
 import { PLANT_DEFS, ZOMBIE_DEFS } from './config/gameConfig.js';
 import PROJECTILE_DEFS from './config/projectileDefs.json' with { type: 'json' };
+import type { LevelSpawn } from './config/levelSpawns.js';
 
 export type PlantType = keyof typeof PLANT_DEFS;
 export type ZombieType = keyof typeof ZOMBIE_DEFS;
 export type SlotProjectileType = keyof typeof PROJECTILE_DEFS;
-// Display-only status for the broadcast wave HUD, derived from orchestration
+// Display-only status for the broadcast wave HUD, derived from the level-spawn
 // state in defaultGameEngine.ts (see computeWaveDisplay) — not stored on RoomState.
 export type WaveStatus = 'pending' | 'spawning' | 'break' | 'complete';
 export type RoomMode = 'twoPlayer' | 'onePlayer' | 'demo';
@@ -82,7 +83,17 @@ export type ZombieState = {
   y: number;
   hp: number;
   chompCooldown: number;
+  // Which wave and chunk of the room's LevelSpawn spawned this zombie. A wave
+  // is over only once no zombie carries its waveIndex. Zombies spawned outside
+  // the script (the admin CLI) use -1, so they never hold a wave open.
+  waveIndex: number;
+  chunkIndex: number;
 };
+
+// Where the room is in its LevelSpawn script. 'break' counts down the wave's
+// breakBefore, 'spawning' works through its chunks, and 'clearing' waits for
+// the wave's last zombie to die.
+export type LevelSpawnPhase = 'break' | 'spawning' | 'clearing';
 
 export type SunPickupState = {
   id: string;
@@ -146,7 +157,16 @@ export type RoomState = {
   tick: number;
   gameOver: boolean;
   result?: 'win' | 'lose';
-  orchestrationStepIndex: number;
-  orchestrationStepTimer: number;
-  orchestrationSpawnedInStep: number;
+  // The zombie script this room plays: a campaign level when `level` is set,
+  // otherwise the preset for `difficulty`. Resolved once at room creation.
+  level: number | null;
+  levelSpawn: LevelSpawn;
+  // Index of the current wave; equals levelSpawn.waves.length once every wave
+  // has been cleared.
+  waveIndex: number;
+  wavePhase: LevelSpawnPhase;
+  chunkIndex: number;
+  spawnedInChunk: number;
+  // Ticks until the next thing happens: the break ending, or the next spawn.
+  spawnTimer: number;
 };

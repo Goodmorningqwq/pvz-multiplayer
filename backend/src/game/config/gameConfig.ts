@@ -143,6 +143,19 @@ export const ZOMBIE_DEFS = {
     chompIntervalTicks: ZOMBIE_CHOMP_INTERVAL_TICKS,
     boss: false,
   },
+  // A shambler wearing a traffic cone: same speed, size and bite, but three
+  // peas to kill instead of one (pea damage is 20, projectileDefs.json). The
+  // cone and maroon shirt (ZombieTextures/conehead) let a player read "this one
+  // takes longer to kill" before it is hit.
+  conehead: {
+    hp: 60,
+    speed: 1,
+    label: 'Conehead',
+    radius: ZOMBIE_RADIUS,
+    chompDamage: ZOMBIE_CHOMP_DAMAGE,
+    chompIntervalTicks: ZOMBIE_CHOMP_INTERVAL_TICKS,
+    boss: false,
+  },
   // First boss-tier zombie. Named for what it is rather than the role it
   // plays: ZOMBIE_DEFS keys are species, so calling this one `boss` would
   // leave a second boss with nowhere to go.
