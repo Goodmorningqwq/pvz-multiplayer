@@ -15,6 +15,7 @@ import {
 } from '../room/roomStore.js';
 import { PlantType, RoomDifficulty } from '../game/types.js';
 import { isValidPlantType } from '../game/plants/plantBehaviors.js';
+import { LEVEL_COUNT } from '../game/config/levelSpawns.js';
 import { RoomEvents } from '../services/roomEvents.js';
 import { log } from '../utils/logger.js';
 
@@ -26,6 +27,12 @@ const VALID_DIFFICULTIES: RoomDifficulty[] = ['easy', 'medium', 'hard'];
 
 function sanitizeDifficulty(value: unknown): RoomDifficulty {
   return VALID_DIFFICULTIES.includes(value as RoomDifficulty) ? (value as RoomDifficulty) : 'medium';
+}
+
+// A 1-based campaign level, or null for "no level, use the difficulty preset".
+function sanitizeLevel(value: unknown): number | null {
+  const level = Number(value);
+  return Number.isInteger(level) && level >= 1 && level <= LEVEL_COUNT ? level : null;
 }
 
 export function registerSocketHandlers(io: SocketIOServer, roomEvents: RoomEvents) {
@@ -105,15 +112,16 @@ export function registerSocketHandlers(io: SocketIOServer, roomEvents: RoomEvent
       log('INFO', `Game started in room ${roomId} by ${playerId}`);
     });
 
-    socket.on('join_one_player_room', (data: { playerId?: string; difficulty?: string }) => {
+    socket.on('join_one_player_room', (data: { playerId?: string; difficulty?: string; level?: number }) => {
       const playerId = sanitizeId(data?.playerId);
       if (!playerId) {
         return;
       }
 
       const difficulty = sanitizeDifficulty(data?.difficulty);
+      const level = sanitizeLevel(data?.level);
       const roomId = `oneplayer-${socket.id}`;
-      const room = getOrCreateRoom(roomId, 'onePlayer', difficulty);
+      const room = getOrCreateRoom(roomId, 'onePlayer', difficulty, level);
       setSocketRoomId(socket.id, roomId);
       socket.join(roomId);
 

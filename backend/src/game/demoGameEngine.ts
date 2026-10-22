@@ -1,7 +1,7 @@
 import { PlantType, RoomState } from './types.js';
 import {
   advanceBirdProjectiles,
-  advanceOrchestration,
+  advanceLevelSpawn,
   advancePlantMatterPickups,
   advancePlants,
   advanceProjectiles,
@@ -34,7 +34,7 @@ const DEMO_PLANT_MATTER = 999999;
 
 function runDemoRoomTick(room: RoomState) {
   room.tick += 1;
-  advanceOrchestration(room);
+  advanceLevelSpawn(room);
   advancePlants(room);
   advanceSunPickups(room);
   advancePlantMatterPickups(room);

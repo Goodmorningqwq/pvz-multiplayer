@@ -159,6 +159,7 @@ export default class GameScene extends Phaser.Scene {
       wave: Number.isFinite(latestState?.wave) ? latestState.wave : 0,
       waveStatus: latestState?.waveStatus || 'pending',
       totalWaves: Number.isFinite(latestState?.totalWaves) ? latestState.totalWaves : 0,
+      level: Number.isFinite(latestState?.level) ? latestState.level : null,
     });
 
     const plantEntities = slots

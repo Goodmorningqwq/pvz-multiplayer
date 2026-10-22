@@ -1,0 +1,25 @@
+<svg width="64" height="156" viewBox="0 -24 64 156" xmlns="http://www.w3.org/2000/svg">
+  <!-- Conehead, frame 1 of 4: the shambler frame 1 with a traffic cone and a
+       maroon shirt. The viewBox grows 24px both above (room for the cone) and
+       below, so the body stays centred under setOrigin(0.5) and lines up
+       with a shambler in the same lane. -->
+  <g stroke="#22301c" stroke-width="2.5" stroke-linejoin="round" stroke-linecap="round">
+    <path d="M35 69 L37 86 L38 101" fill="none" stroke="#3f5230" stroke-width="8" />
+    <path d="M38 43 L44 56" fill="none" stroke="#5c7a3e" stroke-width="7" />
+
+    <path d="M20 33 L44 33 L46 70 L18 70 Z" fill="#6a4a5a" />
+    <path d="M18 61 L27 66 L34 60 L41 66 L46 61 L46 70 L18 70 Z" fill="#563a47" />
+
+    <path d="M29 69 L27 86 L25 101" fill="none" stroke="#5c7a3e" stroke-width="8" />
+    <path d="M26 43 L14 47 L7 43" fill="none" stroke="#6b8c4a" stroke-width="7" />
+
+    <circle cx="29" cy="19" r="12.5" fill="#6b8c4a" />
+    <circle cx="22" cy="17" r="2.6" fill="#22301c" stroke="none" />
+    <path d="M20 26 L30 28" fill="none" stroke="#22301c" stroke-width="2" />
+
+    <!-- Traffic cone: the what tells a conehead apart from a shambler at a glance -->
+    <path d="M15 10 L41 10 L26 -17 Z" fill="#f08a24" stroke="#7a3d0c" />
+    <path d="M20 1 L35 1 L32 -5 L23 -5 Z" fill="#fff2e1" stroke="none" />
+    <rect x="13" y="8" width="30" height="5" rx="1.5" fill="#d9701a" stroke="#7a3d0c" />
+  </g>
+</svg>

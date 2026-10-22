@@ -43,6 +43,7 @@ type HudState = {
   wave: number;
   waveStatus: string;
   totalWaves: number;
+  level: number | null;
 };
 
 type GameOverInfo = {
@@ -60,6 +61,7 @@ const initialHud: HudState = {
   wave: 0,
   waveStatus: 'pending',
   totalWaves: 0,
+  level: null,
 };
 
 // Rejection reasons the server can send back over action_rejected, mapped to
@@ -251,6 +253,7 @@ export default function Game({ roomId, playerId, demoMode, onePlayerMode, socket
         wave: number;
         waveStatus: string;
         totalWaves: number;
+        level: number | null;
       }) => {
         setHud((current) => ({
           ...current,
@@ -263,6 +266,7 @@ export default function Game({ roomId, playerId, demoMode, onePlayerMode, socket
           wave: payload.wave,
           waveStatus: payload.waveStatus,
           totalWaves: payload.totalWaves,
+          level: payload.level,
         }));
       };
       game.events.on('hud-update', handler);
@@ -342,7 +346,10 @@ export default function Game({ roomId, playerId, demoMode, onePlayerMode, socket
             <span className={`mode-badge ${demoMode ? 'mode-badge--demo' : onePlayerMode ? 'mode-badge--solo' : 'mode-badge--live'}`}>
               {demoMode ? 'DEMO' : onePlayerMode ? 'SOLO' : 'LIVE'}
             </span>
-            <span className="stage-wave-label">{waveStatusLabel(hud.waveStatus, hud.wave, hud.totalWaves)}</span>
+            <span className="stage-wave-label">
+              {hud.level !== null && `Level ${hud.level} · `}
+              {waveStatusLabel(hud.waveStatus, hud.wave, hud.totalWaves)}
+            </span>
           </div>
         </div>
 

@@ -21,6 +21,7 @@ let latestState = {
   wave: 0,
   waveStatus: 'pending',
   totalWaves: 0,
+  level: null,
 };
 
 const roomJoinedListeners = new Set();
@@ -88,6 +89,7 @@ function normalizeState(payload) {
     wave: Number.isFinite(payload?.wave) ? payload.wave : 0,
     waveStatus: typeof payload?.waveStatus === 'string' ? payload.waveStatus : 'pending',
     totalWaves: Number.isFinite(payload?.totalWaves) ? payload.totalWaves : 0,
+    level: Number.isFinite(payload?.level) ? payload.level : null,
   };
 }
 
@@ -405,7 +407,9 @@ export function connectDemo({ playerId }) {
   return activeSocket;
 }
 
-export function connectOnePlayer({ playerId, difficulty }) {
+// `level` (1-10) plays that campaign level; leave it out to play the
+// `difficulty` preset instead.
+export function connectOnePlayer({ playerId, difficulty, level }) {
   const activeSocket = createSocket();
   const normalizedPlayerId = toStringId(playerId);
 
@@ -414,7 +418,7 @@ export function connectOnePlayer({ playerId, difficulty }) {
   }
 
   activeSocket.once('connect', () => {
-    activeSocket.emit('join_one_player_room', { playerId: normalizedPlayerId, difficulty });
+    activeSocket.emit('join_one_player_room', { playerId: normalizedPlayerId, difficulty, level });
   });
 
   if (!activeSocket.connected) {
@@ -422,7 +426,7 @@ export function connectOnePlayer({ playerId, difficulty }) {
     return activeSocket;
   }
 
-  activeSocket.emit('join_one_player_room', { playerId: normalizedPlayerId, difficulty });
+  activeSocket.emit('join_one_player_room', { playerId: normalizedPlayerId, difficulty, level });
   return activeSocket;
 }
 
